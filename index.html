@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Title</title>
+        <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no, width=device-width">
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.2.0/dist/leaflet.css" integrity="sha512-M2wvCLH6DSRazYeZRIm1JnYyh22purTM+FDB5CsyxtQJYeKq83arPe5wgbNmcFXGqiSH2XR8dT/fJISVA1r/zQ==" crossorigin=""/>
+        <!-- немного модифицированный файл - использовать только его -->
+        <script src="leaflet-src.js"></script>
+        <style>
+            body, html {
+                height: 100%;
+                width: 100%;
+                margin: 0;
+            }
+
+            #mapid {
+                height: 100%;
+                width: 100%;
+            }
+
+            .leaflet-container {
+                background: #ffffff;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="mapid"></div>
+
+
+        <script>
+            let mymap = L.map('mapid', {
+                crs: L.CRS.Simple,
+                minZoom: -3,
+                maxZoom: 2,
+                renderer: L.canvas(),
+                preferCanvas: true
+            });
+            let bounds = [[0, 0], [1000, 1000]];
+            mymap.fitBounds(bounds);
+
+            getSeats();
+
+            function getSeats() {
+                // 1. Создаём новый объект XMLHttpRequest
+                let xhr = new XMLHttpRequest();
+
+                // 2. Конфигурируем его: GET-запрос на URL 'phones.json'
+                xhr.open('POST', 'https://biletkartina.tv/api/seat/get', true);
+
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
+
+                let formData = new URLSearchParams();
+                formData.append("event_id", "626254548");
+
+                // 3. Отсылаем запрос
+                xhr.send(formData);
+
+                xhr.onreadystatechange = function () {
+                    if (this.readyState != 4) return;
+
+                    let seats = JSON.parse(JSON.parse(xhr.responseText).seats);
+                    let labels = JSON.parse(JSON.parse(xhr.responseText).labels); // здесь лежат лейблы которые надо нарисовать
+                    let seats_labels = []; //номера сидений
+
+                    mymap.setZoom(0, {animate: false}); //Устанавливаем зум = 0, переходим к этому значению без анимации
+                    let pixelOrigin_layer = mymap.getPixelOrigin(); //Получаем координаты начала координат
+                    let current_zoom = 0; //Текущий зум
+                    let fontsbase = []; //База данных всех шрифтов
+                    let main_fontfamily = ""; //Основной шрифт надписей
+
+                    let scene_and_fan = []; // Данные для отрисовки сцены и фанзоны
+
+                    for (let id in seats) {
+                        if (seats.hasOwnProperty(id)) {
+                            if (seats[id].template == "circle") {
+                                seats_labels.push({
+                                    fontfamily: null,
+                                    fontsize: seats[id].width / 2,
+                                    id: seats[id] - (-new Date().getTime()),
+                                    isbold: null,
+                                    isitalic: null,
+                                    rotation: seats[id].rotation,
+                                    textde: null,
+                                    texten: null,
+                                    textru: seats[id].name,
+                                    xc: seats[id].xc,
+                                    yc: seats[id].yc
+                                });
+                            }
+                            else if (seats[id].template == "scene" || seats[id].template == "fanzone") {
+                                scene_and_fan.push(seats[id]);
+                            }
+                        }
+                    }
+
+                    let canvas_layer = L.canvas(); //Создаем слой canvas для надписей, сцены и фанзоны
+                    canvas_layer.addTo(mymap); //Добавляем слой canvas на карту
+                    let canvas_html = document.querySelector('canvas'); //Находим добавленый слой canvas среди элементов DOM
+                    let ctx = canvas_html.getContext("2d"); //Получаем контекст canvas
+                    for (let id in labels) { //Размещаем текста из API на canvas
+                        if (labels.hasOwnProperty(id)) {
+                            wrightNotes(labels[id], ctx, pixelOrigin_layer, 0);
+
+                            //Составляем базу всех встречающихся шрифтов с указанием количества
+                            if (fontsbase.length === 0) {
+                                fontsbase.push({fontfamily: labels[id].fontfamily, count: 1});
+                            }
+                            else {
+                                let isFind = false;
+                                for (let i=0; i<fontsbase.length; i++) {
+                                    if (fontsbase[i].fontfamily === labels[id].fontfamily) {
+                                        fontsbase[i].count ++;
+                                        isFind = true;
+                                    }
+                                }
+                                if (!isFind) {
+                                    fontsbase.push({fontfamily: labels[id].fontfamily, count: 1});
+                                }
+                            }
+                        }
+                    }
+
+                    // Находим самый частоиспользуемый шрифт надписей
+                    let count = 0;
+                    for (let i in fontsbase) {
+                        if (fontsbase[i].count > count) {
+                            count = fontsbase[i].count;
+                            main_fontfamily = fontsbase[i].fontfamily;
+                        }
+                    }
+
+                    for (let i=0; i<seats_labels.length; i++) {
+                        wrightNotes(seats_labels[i], ctx, pixelOrigin_layer, 0, main_fontfamily);
+                    }
+
+                    // let scene_and_fan = []; // Данные для отрисовки сцены и фанзоны
+
+                    // Отрисовываем сцену и фанзону
+                    for (let i in scene_and_fan) {
+                        scene_and_fan[i].rectx = scene_and_fan[i].xc; //Перемещаем значение х в свойство rectх
+                        scene_and_fan[i].recty = scene_and_fan[i].yc; //Перемещаем значение у в свойство rectу
+                        scene_and_fan[i].bgcolor = scene_and_fan[i].color; //Перемещаем значение color в свойство bgcolor
+
+                        drowRect(scene_and_fan[i], ctx, pixelOrigin_layer, 0);
+
+                        scene_and_fan[i].fontfamily = main_fontfamily; //Присваиваем значение fontfamily
+                        scene_and_fan[i].textru = scene_and_fan[i].name; //Присваиваем значение текста
+                        scene_and_fan[i].color = '000000';
+
+                        let fontsize = 0; //Расчетное значение размера шрифта надписи
+                        let margin = 20; //Значение отступов слева и справа в надписи (сцена и фанзона), в процентах
+                        // Вычисление и присвоение значения размера шрифта
+                        ctx.font = fontsize + "px " + scene_and_fan[i].fontfamily;
+                        while (ctx.measureText(scene_and_fan[i].textru).width < scene_and_fan[i].width*(100 - margin*2)/100) {
+                            fontsize++;
+                            ctx.font = fontsize + "px " + scene_and_fan[i].fontfamily;
+                        }
+                        scene_and_fan[i].fontsize = fontsize;
+                        wrightNotes(scene_and_fan[i], ctx, pixelOrigin_layer, 0);
+                    }
+
+                    for (let id in seats) {
+                        if (seats.hasOwnProperty(id)) {
+                            if (seats[id].template == "circle") {
+                                let circle = new L.Circle([seats[id].yc, seats[id].xc], {
+                                    color: "#" + seats[id].color, fillColor: '#' + seats[id].color, radius: (+seats[id].width / 2),
+                                    fillOpacity: 0.5, weight: 0//, row: seats[id].row, num: seats[id].num, price: seats[id].price
+                                });
+
+                                circle.bindTooltip('Ряд: ' + seats[id].row + ' место: ' + seats[id].num + ' цена: ' + seats[id].price, {
+                                    direction: 'top'
+                                }).addTo(mymap);
+                            }
+                        }
+                    }
+
+                    canvas_layer.on('update', function(e) { //Перерисовываем текста при обновлении слоя (зум и перемещение)
+                        if (current_zoom != e.target._zoom) { //Получаем заново начало координат, если изменилось значение зума
+                            pixelOrigin_layer = mymap.getPixelOrigin();
+                        }
+
+                        for (let i in scene_and_fan) {
+                            drowRect(scene_and_fan[i], ctx, pixelOrigin_layer, e.target._zoom);
+                            wrightNotes(scene_and_fan[i], ctx, pixelOrigin_layer, e.target._zoom);
+                        }
+
+                        for (let i=0; i<seats_labels.length; i++) {
+                            wrightNotes(seats_labels[i], ctx, pixelOrigin_layer, e.target._zoom, main_fontfamily);
+                        }
+
+                        for (let id in labels) {
+                            if (labels.hasOwnProperty(id)) {
+                                wrightNotes(labels[id], ctx, pixelOrigin_layer, e.target._zoom);
+                            }
+                        }
+                        current_zoom = e.target._zoom; //Присваиваем новое значение текущему зуму
+                    });
+                };
+            }
+
+            function wrightNotes(label, context, pixel_origin, zoom = 0, fontfamily) {
+                let koef = Math.pow(2, zoom); //Коэффициент для пересчета координат после зума
+                context.fillStyle = "#"+label.color || "#000000";
+                let f_family = label.fontfamily || fontfamily;
+                context.font = koef*label.fontsize + "px " + f_family; //Устанавливаем размер и шрифт текста
+                let delta = {x: Number((context.measureText(label.textru).width/2).toFixed(2)), y: Number(((koef*label.fontsize*0.45)/2).toFixed(2))}; //Поправка. Возникает из-за того, что из API передаются координаты центра, а canvas рисует из левого нижнего угла.
+                context.translate((koef*label.xc-pixel_origin.x), (koef*label.yc-pixel_origin.y)); //Переносим начало координат в цент текста
+                context.rotate(label.rotation*Math.PI/180); //Поворачиваем текст вокруг НАЧАЛА КООРДИНАТ
+                context.fillText(label.textru, -delta.x, delta.y); //Рисуем перевернутый текст
+                context.rotate(-label.rotation*Math.PI/180); //Делаем обратный поворот относительно НАЧАЛА КООРДИНАТ
+                context.translate(-(koef*label.xc-pixel_origin.x), -(koef*label.yc-pixel_origin.y)); //Возвращаем начало координат на место
+            }
+
+            function drowRect(rect, context, pixel_origin, zoom = 0) {
+                let koef = Math.pow(2, zoom); //Коэффициент для пересчета координат после зума
+                context.fillStyle = "rgba(" + hex2rgb(rect.bgcolor).r+","+hex2rgb(rect.bgcolor).g+","+hex2rgb(rect.bgcolor).b+",0.5)";
+                context.fillRect(koef*rect.rectx - koef*(rect.width/2) - pixel_origin.x, koef*rect.recty - koef*(rect.height/2) - pixel_origin.y, koef*rect.width, koef*rect.height);
+            }
+
+            function hex2rgb(c) {
+                let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(c);
+                return result ? {
+                    r: parseInt(result[1], 16),
+                    g: parseInt(result[2], 16),
+                    b: parseInt(result[3], 16)
+                } : null;
+            }
+        </script>
+    </body>
+</html>
