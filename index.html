@@ -69,30 +69,25 @@
                     let fontsbase = []; //База данных всех шрифтов
                     let main_fontfamily = ""; //Основной шрифт надписей
 
-                    let scene_and_fan = []; // Данные для отрисовки сцены и фанзоны
-
-                    for (let id in seats) {
-                        if (seats.hasOwnProperty(id)) {
-                            if (seats[id].template == "circle") {
-                                seats_labels.push({
-                                    fontfamily: null,
-                                    fontsize: seats[id].width / 2,
-                                    id: seats[id] - (-new Date().getTime()),
-                                    isbold: null,
-                                    isitalic: null,
-                                    rotation: seats[id].rotation,
-                                    textde: null,
-                                    texten: null,
-                                    textru: seats[id].name,
-                                    xc: seats[id].xc,
-                                    yc: seats[id].yc
-                                });
-                            }
-                            else if (seats[id].template == "scene" || seats[id].template == "fanzone") {
-                                scene_and_fan.push(seats[id]);
-                            }
-                        }
-                    }
+                    // for (let id in seats) {
+                    //     if (seats.hasOwnProperty(id)) {
+                    //         if (seats[id].template == "circle") {
+                    //             seats_labels.push({
+                    //                 fontfamily: null,
+                    //                 fontsize: seats[id].width / 2,
+                    //                 id: seats[id] - (-new Date().getTime()),
+                    //                 isbold: null,
+                    //                 isitalic: null,
+                    //                 rotation: seats[id].rotation,
+                    //                 textde: null,
+                    //                 texten: null,
+                    //                 textru: seats[id].name,
+                    //                 xc: seats[id].xc,
+                    //                 yc: seats[id].yc
+                    //             });
+                    //         }
+                    //     }
+                    // }
 
                     let canvas_layer = L.canvas(); //Создаем слой canvas для надписей, сцены и фанзоны
                     canvas_layer.addTo(mymap); //Добавляем слой canvas на карту
@@ -130,11 +125,29 @@
                         }
                     }
 
-                    for (let i=0; i<seats_labels.length; i++) {
-                        wrightNotes(seats_labels[i], ctx, pixelOrigin_layer, 0, main_fontfamily);
-                    }
+                    // for (let i=0; i<seats_labels.length; i++) {
+                    //     wrightNotes(seats_labels[i], ctx, pixelOrigin_layer, 0, main_fontfamily);
+                    // }
 
-                    // let scene_and_fan = []; // Данные для отрисовки сцены и фанзоны
+                    let scene_and_fan = []; // Данные для отрисовки сцены и фанзоны
+
+                    for (let id in seats) {
+                        if (seats.hasOwnProperty(id)) {
+                            if (seats[id].template == "circle") {
+                                let circle = new L.Circle([seats[id].yc, seats[id].xc], {
+                                    color: "#" + seats[id].color, fillColor: '#' + seats[id].color, radius: (+seats[id].width / 2),
+                                    fillOpacity: 1, weight: 0//, row: seats[id].row, num: seats[id].num, price: seats[id].price
+                                });
+
+                                circle.bindTooltip('Ряд: ' + seats[id].row + ' место: ' + seats[id].num + ' цена: ' + seats[id].price, {
+                                    direction: 'top'
+                                }).addTo(mymap);
+                            }
+                            else if (seats[id].template == "scene" || seats[id].template == "fanzone") {
+                                scene_and_fan.push(seats[id]);
+                            }
+                        }
+                    }
 
                     // Отрисовываем сцену и фанзону
                     for (let i in scene_and_fan) {
@@ -160,21 +173,6 @@
                         wrightNotes(scene_and_fan[i], ctx, pixelOrigin_layer, 0);
                     }
 
-                    for (let id in seats) {
-                        if (seats.hasOwnProperty(id)) {
-                            if (seats[id].template == "circle") {
-                                let circle = new L.Circle([seats[id].yc, seats[id].xc], {
-                                    color: "#" + seats[id].color, fillColor: '#' + seats[id].color, radius: (+seats[id].width / 2),
-                                    fillOpacity: 0.5, weight: 0//, row: seats[id].row, num: seats[id].num, price: seats[id].price
-                                });
-
-                                circle.bindTooltip('Ряд: ' + seats[id].row + ' место: ' + seats[id].num + ' цена: ' + seats[id].price, {
-                                    direction: 'top'
-                                }).addTo(mymap);
-                            }
-                        }
-                    }
-
                     canvas_layer.on('update', function(e) { //Перерисовываем текста при обновлении слоя (зум и перемещение)
                         if (current_zoom != e.target._zoom) { //Получаем заново начало координат, если изменилось значение зума
                             pixelOrigin_layer = mymap.getPixelOrigin();
@@ -185,9 +183,9 @@
                             wrightNotes(scene_and_fan[i], ctx, pixelOrigin_layer, e.target._zoom);
                         }
 
-                        for (let i=0; i<seats_labels.length; i++) {
-                            wrightNotes(seats_labels[i], ctx, pixelOrigin_layer, e.target._zoom, main_fontfamily);
-                        }
+                        // for (let i=0; i<seats_labels.length; i++) {
+                        //     wrightNotes(seats_labels[i], ctx, pixelOrigin_layer, e.target._zoom, main_fontfamily);
+                        // }
 
                         for (let id in labels) {
                             if (labels.hasOwnProperty(id)) {
@@ -214,7 +212,7 @@
 
             function drowRect(rect, context, pixel_origin, zoom = 0) {
                 let koef = Math.pow(2, zoom); //Коэффициент для пересчета координат после зума
-                context.fillStyle = "rgba(" + hex2rgb(rect.bgcolor).r+","+hex2rgb(rect.bgcolor).g+","+hex2rgb(rect.bgcolor).b+",0.5)";
+                context.fillStyle = "rgba(" + hex2rgb(rect.bgcolor).r+","+hex2rgb(rect.bgcolor).g+","+hex2rgb(rect.bgcolor).b+",1)";
                 context.fillRect(koef*rect.rectx - koef*(rect.width/2) - pixel_origin.x, koef*rect.recty - koef*(rect.height/2) - pixel_origin.y, koef*rect.width, koef*rect.height);
             }
 
