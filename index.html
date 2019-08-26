@@ -95,7 +95,7 @@
             let ctx = canvas_html.getContext("2d"); //Получаем контекст canvas
             for (let id in labels) { //Размещаем текста из API на canvas
                 if (labels.hasOwnProperty(id)) {
-                    // wrightNotes(labels[id], ctx, pixelOrigin_layer, 0);
+                    wrightNotes(labels[id], ctx, pixelOrigin_layer, 0);
 
                     //Составляем базу всех встречающихся шрифтов с указанием количества
                     if (fontsbase.length === 0) {
@@ -187,11 +187,11 @@
                 //     wrightNotes(seats_labels[i], ctx, pixelOrigin_layer, e.target._zoom, main_fontfamily);
                 // }
 
-                // for (let id in labels) {
-                //     if (labels.hasOwnProperty(id)) {
-                //         wrightNotes(labels[id], ctx, pixelOrigin_layer, e.target._zoom);
-                //     }
-                // }
+                for (let id in labels) {
+                    if (labels.hasOwnProperty(id)) {
+                        wrightNotes(labels[id], ctx, pixelOrigin_layer, e.target._zoom);
+                    }
+                }
                 current_zoom = e.target._zoom; //Присваиваем новое значение текущему зуму
             });
         };
